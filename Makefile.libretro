@@ -1,4 +1,5 @@
 STATIC_LINKING=0
+OLD_GCC = 0
 
 CORE_DIR := .
 
@@ -160,9 +161,9 @@ else ifeq ($(platform), ps2)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = ee-gcc$(EXE_EXT)
    AR = ee-ar$(EXE_EXT)
-   PLATFORM_DEFINES := -DPS2 -G0
-   CFLAGS := -Ips2
+   PLATFORM_DEFINES := -DPS2 -G0 -DABGR1555
    STATIC_LINKING = 1
+   OLD_GCC = 1
 
 # Vita
 else ifeq ($(platform), vita)
@@ -482,7 +483,10 @@ fpic=
 SHARED=
 endif
 
-CFLAGS += -Wall -Wno-switch -Wno-parentheses -Wno-unused-variable -Wno-unused-but-set-variable -Wextra -Wno-unused-parameter -Wno-sign-compare -Wmissing-prototypes -DLIBRETRO=1
+CFLAGS += -Wall -Wno-switch -Wno-parentheses -Wno-unused-variable -Wno-unused-parameter -Wno-sign-compare -Wmissing-prototypes -DLIBRETRO=1
+ifeq ($(OLD_GCC), 0)
+CFLAGS += -Wno-unused-but-set-variable -Wextra
+endif
 CFLAGS += -std=gnu99
 
 ifeq ($(DEBUG), 1)

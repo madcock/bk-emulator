@@ -49,6 +49,10 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/libnx-static.yml'
 
+  # PlayStation 2
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/ps2-static.yml'
+
   # PlayStation Portable
   - project: 'libretro-infrastructure/ci-templates'
     file: '/psp-static.yml'
@@ -105,6 +109,12 @@ android-x86_64:
 android-x86:
   extends:
     - .libretro-android-jni-x86
+    - .core-defs
+
+# PlayStation 2
+libretro-build-ps2:
+  extends:
+    - .libretro-ps2-static-retroarch-master
     - .core-defs
 
 # PlayStation Portable
