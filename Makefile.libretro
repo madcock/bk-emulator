@@ -201,6 +201,49 @@ else ifeq ($(platform), vita)
 	AR = arm-vita-eabi-ar$(EXE_EXT)
    PLATFORM_DEFINES := -DVITA
    STATIC_LINKING = 1
+# RS90
+else ifeq ($(platform), rs90)
+   TARGET := $(TARGET_NAME)_libretro.so
+   CC = /opt/rs90-toolchain/usr/bin/mipsel-linux-gcc
+   CXX = /opt/rs90-toolchain/usr/bin/mipsel-linux-g++
+   AR = /opt/rs90-toolchain/usr/bin/mipsel-linux-ar
+   fpic := -fPIC
+   SHARED := -shared -Wl,-version-script=$(CORE_DIR)/link.T
+   PLATFORM_DEFINES := -DCC_RESAMPLER -DCC_RESAMPLER_NO_HIGHPASS
+   CFLAGS += -fomit-frame-pointer -ffast-math -march=mips32 -mtune=mips32
+   CXXFLAGS += $(CFLAGS)
+# GCW0
+else ifeq ($(platform), gcw0)
+	TARGET := $(TARGET_NAME)_libretro.so
+	CC = /opt/gcw0-toolchain/usr/bin/mipsel-linux-gcc
+	AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
+	fpic := -fPIC
+	SHARED := -shared -Wl,--version-script=link.T -Wl,-no-undefined
+	
+	DISABLE_ERROR_LOGGING := 1
+	CFLAGS += -march=mips32 -mtune=mips32r2 -mhard-float
+	LIBS = -lm
+
+# RETROFW
+else ifeq ($(platform), retrofw)
+	EXT ?= so
+	TARGET := $(TARGET_NAME)_libretro.$(EXT)
+	CC = /opt/retrofw-toolchain/usr/bin/mipsel-linux-gcc
+	AR = /opt/retrofw-toolchain/usr/bin/mipsel-linux-ar
+	fpic := -fPIC
+	SHARED := -shared -Wl,--version-script=$(CORE_DIR)/link.T -Wl,--no-undefined
+	CFLAGS += -ffast-math -march=mips32 -mtune=mips32 -mhard-float
+	LIBS = -lm
+# MIYOO
+else ifeq ($(platform), miyoo)
+	TARGET := $(TARGET_NAME)_libretro.so
+	fpic := -fPIC
+	SHARED := -shared -Wl,-version-script=link.T
+	CC = /opt/miyoo/usr/bin/arm-linux-gcc
+	AR = /opt/miyoo/usr/bin/arm-linux-ar
+	PLATFORM_DEFINES += -D_GNU_SOURCE
+	CFLAGS += -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
+	CFLAGS += -fno-common -ftree-vectorize -funswitch-loops
 
 # CTR (3DS)
 else ifeq ($(platform), ctr)
@@ -511,8 +554,10 @@ fpic=
 SHARED=
 endif
 
-CFLAGS += -Wall -Wno-switch -Wno-parentheses -Wno-unused-variable -Wno-unused-parameter -Wno-sign-compare -Wmissing-prototypes -DLIBRETRO=1
-ifeq ($(OLD_GCC), 0)
+CFLAGS += -DLIBRETRO=1
+
+ifeq ($(ENABLE_WARNINGS), 1)
+CFLAGS += -Wall -Wno-switch -Wno-parentheses -Wno-unused-variable -Wno-unused-parameter -Wno-sign-compare -Wmissing-prototypes 
 CFLAGS += -Wno-unused-but-set-variable -Wextra
 endif
 CFLAGS += -std=gnu99
