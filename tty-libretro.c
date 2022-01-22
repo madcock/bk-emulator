@@ -292,6 +292,10 @@ static bool curstate[RETROK_LAST];
 static RETRO_CALLCONV void keyboard_cb(bool down, unsigned keycode,
       uint32_t character, uint16_t mod)
 {
+	if (keycode == 0 && down == 0 && character == 0) {
+		memset(curstate, 0, sizeof(curstate));
+		tty_keyevent(-1);
+	}
 	if (keycode >= RETROK_LAST)
 		return;
 	if (curstate[keycode] == down)
