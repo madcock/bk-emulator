@@ -323,11 +323,22 @@ void fake_read_strobe() {
 void
 fake_write_file() {
 	d_word base;
+	const char *fullpath = NULL;
+	char *alloc_fullpath = NULL;
 	lc_word(0306, &base);
 	get_emt36_filename();
-	tape_write_file = fopen(unix_filename, "w");
+	if (tape_prefix != NULL) {
+		int al = strlen(unix_filename) + strlen(tape_prefix) + 7;
+		alloc_fullpath = malloc (al+1);
+		strncpy(alloc_fullpath, tape_prefix, al);
+		strncat(alloc_fullpath, unix_filename, al);
+		fullpath = alloc_fullpath;
+	} else
+		fullpath = unix_filename;
+
+	tape_write_file = fopen(fullpath, "w");
 	fprintf(stderr, "Will%swrite BK file <%s> under unix file name <%s>\n",
-		tape_write_file ? " " : " NOT ", bk_filename, unix_filename);
+		tape_write_file ? " " : " NOT ", bk_filename, fullpath);
 	if (tape_write_file) {
 		d_word addr;
 	        d_word length;
@@ -352,5 +363,7 @@ fake_write_file() {
 	}
 	/* Fake RTS PC */
 	pop( &pdp, &pdp.regs[PC] );
+	if (alloc_fullpath != NULL)
+		free (alloc_fullpath);
 }
 
