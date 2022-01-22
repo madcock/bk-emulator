@@ -4,7 +4,9 @@
 #include "tty.h"
 
 static int ar2 = 0, shift = 0, ctrl;
+static int use_callback;
 extern retro_environment_t environ_cb;
+extern retro_input_state_t input_state_cb;
 
 struct keymap {
 	int normal[RETROK_LAST];
@@ -353,7 +355,63 @@ tty_set_keymap()
 }
 
 void
+tty_poll() {
+	if (use_callback)
+		return;
+	ar2 = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LSUPER) || input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LALT);
+	shift = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LSHIFT) || input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RSHIFT);
+	ctrl = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LCTRL) || input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RCTRL);
+	int change = 0;
+	int value = 0;
+	int c = -1;
+
+	for (int keycode = 0; keycode < RETROK_LAST; keycode++) {
+		int newstate = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, keycode);
+		if (curstate[keycode] != newstate) {
+			int curc;
+			curstate[keycode] = newstate;
+			if (shift && current_keymap->shifted[keycode]) {
+				curc = current_keymap->shifted[keycode];
+			} else if (current_keymap->normal[keycode]) {
+				curc = current_keymap->normal[keycode];
+			}
+			if (keycode == RETROK_F11)
+				curc = TTY_RESET;
+			if (curc) {
+				change = 1;
+				if (newstate)
+					c = curc;
+			}
+		}
+	}
+
+	if (!change)
+		return;
+	
+	if (c == -1) {
+		tty_keyevent(c);
+		return;
+	}
+	/* TODO: caps lock.  */
+	if (ctrl && (c & 0100))
+		c &= 037;
+	if (ar2) {
+	    c |= 0200;
+	}
+	tty_keyevent(c);
+}
+
+void
 tty_open() {
-  	static struct retro_keyboard_callback cb = { keyboard_cb };
-	environ_cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &cb);
+    	struct retro_variable var;
+	
+	var.key = "bk_keyboard_type";
+	var.value = NULL;
+
+	use_callback = (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value && strcmp(var.value, "callback") == 0);
+
+	if (use_callback) {
+		static struct retro_keyboard_callback cb = { keyboard_cb };
+		environ_cb(RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK, &cb);
+	}
 }

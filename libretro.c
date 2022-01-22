@@ -24,7 +24,7 @@ static retro_audio_sample_batch_t audio_batch_cb;
 
 retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
-static retro_input_state_t input_state_cb;
+retro_input_state_t input_state_cb;
 static int joystick_enabled;
 
 float frame_time = 0;
@@ -160,6 +160,10 @@ void retro_set_environment(retro_environment_t cb)
 			{
 				"bk_color",
 				"Use color display; enabled|disabled",
+			},
+			{
+				"bk_keyboard_type",
+				"Keyboard type (restart); poll|callback",
 			},
 			{ NULL, NULL },
 		};
@@ -340,6 +344,8 @@ void retro_run(void)
 		}
 		joystick_cur_state = new_state;
 	}
+
+	tty_poll();
 
   run_cpu_until(&pdp, ++framectr * TICK_RATE/FPS);
 
