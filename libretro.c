@@ -558,87 +558,6 @@ void platform_sound_init() {
 void platform_disk_init(disk_t *disks) {
 }
 
-
-void *load_rom_file(const char * rompath, size_t *sz, size_t min_sz, size_t max_sz)
-{
-	char *path = malloc(strlen(romdir)+strlen(rompath)+2);
-
-	if (!path) {
-		log_cb(RETRO_LOG_ERROR, "No memory");
-		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-		return NULL;
-	}
-
-	/* If rompath is a real path, do not apply romdir to it */
-	if (*romdir && !strchr(rompath, '/'))
-		sprintf(path, "%s/%s", romdir, rompath);
-	else
-		strcpy(path, rompath);
-
-	log_cb(RETRO_LOG_INFO, "Loading %s...\n", path);
-
-	if (vfs_interface)
-	{
-		struct retro_vfs_file_handle *romf = vfs_interface->open(
-			path,
-			RETRO_VFS_FILE_ACCESS_READ,
-			RETRO_VFS_FILE_ACCESS_HINT_NONE);
-		
-		if (!romf) {
-			log_cb(RETRO_LOG_ERROR, "Couldn't open file.\n");
-			environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-			return NULL;
-		}
-
-		size_t fsz = vfs_interface->size(romf);
-		if (fsz > max_sz)
-			fsz = max_sz;
-
-		if (fsz < min_sz) {
-			log_cb(RETRO_LOG_ERROR, "Incomplete or damaged file.\n");
-			environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-			return NULL;
-		}
-
-		char *ret = malloc (fsz + 1);
-		vfs_interface->read(romf, ret, fsz);
-		vfs_interface->close(romf);
-		
-		*sz = fsz;
-
-		free(path);
-
-		return ret;
-	} else {
-		FILE * romf = fopen(path, "r");
-		if (!romf) {
-			log_cb(RETRO_LOG_ERROR, "Couldn't open file.\n");
-			environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-			return NULL;
-		}
-
-		char *ret = malloc (max_sz);
-		int c, i = 0;
-
-		while ((c = fgetc(romf)) >= 0)
-			ret[i++] = c;
-
-		fclose(romf);
-
-		if (i < min_sz) {
-			log_cb(RETRO_LOG_ERROR, "Incomplete or damaged file.\n");
-			environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-			return NULL;
-		}
-
-		*sz = i;
-
-		free(path);
-
-		return ret;
-	}
-}
-
 struct libretro_handle
 {
 	FILE *stdio;
@@ -717,4 +636,86 @@ void libretro_vfs_flush(struct libretro_handle *h)
 	}
 
 	fflush(h->stdio);
+}
+
+int64_t libretro_vfs_get_size(struct libretro_handle *h)
+{
+	if (h->lr) {
+		return vfs_interface->size(h->lr);
+	}
+
+	long old_pos = ftell(h->stdio);
+	fseek(h->stdio, 0, SEEK_END);
+	long ret = ftell(h->stdio);
+	fseek(h->stdio, old_pos, SEEK_SET);
+	return ret;
+}
+
+void libretro_vfs_read(struct libretro_handle *h, void *s, uint64_t len)
+{
+	if (h->lr) {
+		vfs_interface->read(h->lr, s, len);
+		return;
+	}
+
+	fread(s, 1, len, h->stdio);
+}
+
+void *load_rom_file(const char * rompath, size_t *sz, size_t min_sz, size_t max_sz)
+{
+	char *path = malloc(strlen(romdir)+strlen(rompath)+2);
+
+	if (!path) {
+		log_cb(RETRO_LOG_ERROR, "No memory");
+		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+		return NULL;
+	}
+
+	/* If rompath is a real path, do not apply romdir to it */
+	if (*romdir && !strchr(rompath, '/'))
+		sprintf(path, "%s/%s", romdir, rompath);
+	else
+		strcpy(path, rompath);
+
+	log_cb(RETRO_LOG_INFO, "Loading %s...\n", path);
+
+	struct libretro_handle *romf = libretro_vfs_open(path, "r");
+	if (!romf) {
+		char *optr;
+		const char *iptr;
+		if (*romdir && !strchr(rompath, '/'))
+			sprintf(path, "%s/", romdir);
+		for (optr = path + strlen(path), iptr = rompath; *iptr; optr++, iptr++)
+			*optr = tolower(*iptr);
+		*optr = '\0';
+		log_cb(RETRO_LOG_INFO, "Attempting to load %s...\n", path);
+		romf = libretro_vfs_open(path, "r");
+	}
+
+	if (!romf) {
+		log_cb(RETRO_LOG_ERROR, "Couldn't open file.\n");
+		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+		return NULL;
+	}
+
+	size_t fsz = libretro_vfs_get_size(romf);
+	if (fsz > max_sz)
+		fsz = max_sz;
+
+	if (fsz < min_sz) {
+		log_cb(RETRO_LOG_ERROR, "Incomplete or damaged file.\n");
+		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+		return NULL;
+	}
+
+	char *ret = malloc (fsz + 1);
+	libretro_vfs_read(romf, ret, fsz);
+	libretro_vfs_close(romf);
+	ret[fsz] = '\0';
+		
+	*sz = fsz;
+
+	free(path);
+
+	return ret;
 }
