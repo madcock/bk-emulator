@@ -15,6 +15,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#define tape_popen(cmd, mode) popen(cmd, mode)
+#define tape_pclose(f) pclose(f)
 #endif
 #include "intl.h"
 #include <ctype.h>
