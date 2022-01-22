@@ -31,6 +31,7 @@ float frame_time = 0;
 int breakpoint = -1;
 extern unsigned short framebuf[512][512];
 static int joystick_cur_state = 0;
+static double aspect_ratio = 1;
 
 void platform_joystick_init() {
 }
@@ -122,7 +123,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.base_height  = 512;
    info->geometry.max_width    = 512;
    info->geometry.max_height   = 512;
-   info->geometry.aspect_ratio = 1.0;
+   info->geometry.aspect_ratio = aspect_ratio;
 }
 
 enum {
@@ -170,6 +171,10 @@ void retro_set_environment(retro_environment_t cb)
 			{
 				"bk_keyboard_type",
 				"Keyboard type (restart); poll|callback",
+			},
+			{
+				"bk_aspect_ratio",
+				"Aspect ratio; 1:1|4:3",
 			},
 			{ NULL, NULL },
 		};
@@ -296,6 +301,14 @@ static void update_variables(bool startup)
 				bkmodel = 3;
 		} else
 			bkmodel = 3;
+	}
+
+	var.key = "bk_aspect_ratio";
+	var.value = NULL;
+	if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value != NULL && strcmp (var.value, "4:3") == 0) {
+		aspect_ratio = 4.0/3.0;
+	} else {
+		aspect_ratio = 1.0;
 	}
 
 	tty_set_keymap();
