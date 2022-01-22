@@ -607,6 +607,8 @@ void *retro_get_memory_data(unsigned id)
        {
        case RETRO_MEMORY_SAVE_RAM: // SRAM
                return disks_total_size ? disks_buffer : NULL;
+       case RETRO_MEMORY_SYSTEM_RAM:
+	       return current_state._ram;
        }
        return NULL;
 }
@@ -617,6 +619,8 @@ size_t retro_get_memory_size(unsigned id)
        {
        case RETRO_MEMORY_SAVE_RAM: // SRAM
                return disks_total_size;
+       case RETRO_MEMORY_SYSTEM_RAM:
+	       return sizeof(current_state._ram);
        }
        return 0;
 }
