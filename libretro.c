@@ -238,9 +238,8 @@ void retro_reset(void)
 #define MAX_SAMPLES_PER_FRAME 5000
 static const int16_t zero_samples[MAX_SAMPLES_PER_FRAME * 2];
 
-static const void * game_data;
+static void * game_data;
 static size_t game_size;
-static int hasgame = 0;
 
 static void update_variables(bool startup)
 {
@@ -309,10 +308,12 @@ void retro_run(void)
 
 	input_poll_cb();
 
-	if (hasgame == 1 && framectr > 2)
+	if (game_data && framectr > 2)
 	{
-		hasgame = 0;
                 load_and_run_bin(game_data, game_size);
+		free(game_data);
+		game_data = NULL;
+		game_size = 0;
 	}
 
 	if (mouseflag) {
@@ -373,7 +374,6 @@ bool retro_load_game(const struct retro_game_info *info)
                 game_data = gd;
                 memcpy (gd, info->data, info->size);
                 game_size = info->size;
-		hasgame = 1;
 	}
 
         if (info && info->path) {
