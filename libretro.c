@@ -107,7 +107,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #endif
    info->library_version  = "v1.0" GIT_VERSION;
    info->need_fullpath    = false;
-   info->valid_extensions = "bin";
+   info->valid_extensions = "bin|img|dsk|bkd";
 }
 
 #define FPS 25
@@ -124,6 +124,12 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    info->geometry.max_height   = 512;
    info->geometry.aspect_ratio = 1.0;
 }
+
+enum {
+	SUBSYSTEM_2_FLOPPIES = 2,
+	SUBSYSTEM_3_FLOPPIES,
+	SUBSYSTEM_4_FLOPPIES,
+};
 
 void retro_set_environment(retro_environment_t cb)
 {
@@ -206,8 +212,23 @@ void retro_set_environment(retro_environment_t cb)
 		}
 	};
 
+	static struct retro_subsystem_rom_info floppies[] = {
+		{"Floppy A", "img|dsk|bkd", false, false, false, NULL, 0},
+		{"Floppy B", "img|dsk|bkd", false, false, false, NULL, 0},
+		{"Floppy C", "img|dsk|bkd", false, false, false, NULL, 0},
+		{"Floppy D", "img|dsk|bkd", false, false, false, NULL, 0},
+	};
+
+	static struct retro_subsystem_info subsys[] = {
+		{"2 floppies", "floppy2", floppies, 2, SUBSYSTEM_2_FLOPPIES },
+		{"3 floppies", "floppy3", floppies, 3, SUBSYSTEM_3_FLOPPIES },
+		{"4 floppies", "floppy4", floppies, 4, SUBSYSTEM_4_FLOPPIES },
+		{ NULL, NULL, NULL, 0, 0 }
+	};
 
 	environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, &ci);
+
+	environ_cb(RETRO_ENVIRONMENT_SET_SUBSYSTEM_INFO, &subsys);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -244,6 +265,9 @@ static const int16_t zero_samples[MAX_SAMPLES_PER_FRAME * 2];
 
 static void * game_data;
 static size_t game_size;
+static void *disks_buffer;
+static size_t disks_total_size;
+static size_t disk_size[4];
 
 static void update_variables(bool startup)
 {
@@ -373,24 +397,48 @@ static int game_init_pixelformat(void)
    return 1;
 }
 
-bool retro_load_game(const struct retro_game_info *info)
-{
-	if (info && info->data) {
-		void *gd = malloc(info->size);
-                game_data = gd;
-                memcpy (gd, info->data, info->size);
-                game_size = info->size;
-	}
+static bool load_game_real(const char *image_path,
+			   const void *bin, size_t bin_size,
+			   const struct retro_game_info *floppy_info, size_t floppy_num) {
+	const char *dir;
+	int i;
 
-        if (info && info->path) {
-                char *slash = strrchr(info->path, '/');
+	if (image_path) {
+                char *slash = strrchr(image_path, '/');
                 if (slash) {
-                        tape_prefix = strdup(info->path);
-                        tape_prefix[slash - info->path + 1] = '\0';
+                        tape_prefix = strdup(image_path);
+                        tape_prefix[slash - image_path + 1] = '\0';
                 }
         }
+	
+	if (bin) {
+		void *gd = malloc(bin_size);
+		if (!gd)
+			return false;
+                memcpy (gd, bin, bin_size);
+		game_data = gd;
+		game_size = bin_size;
+	}
 
-	const char *dir;
+	disks_total_size = 0;
+	for (i = 0; i < floppy_num; i++)
+		disks_total_size += (floppy_info[i].size && floppy_info[i].data) ? floppy_info[i].size : 0;
+	disks_buffer = malloc(disks_total_size);
+	if (!disks_buffer)
+		return false;
+
+	char *diskptr = disks_buffer;
+	for (i = 0; i < floppy_num; i++) {
+		size_t sz = (floppy_info[i].size && floppy_info[i].data) ? floppy_info[i].size : 0;
+		if (sz) {
+			memcpy (diskptr, floppy_info[i].data, sz);
+		}
+		diskptr += sz;
+		disk_size[i] = sz;
+	}
+	for (; i < 4; i++) {
+		disk_size[i] = 0;
+	}
 
 	nflag = 1;		/* enable sound */
 	/* nothing is connected to the port by default, use ~/.bkrc */
@@ -437,7 +485,7 @@ bool retro_load_game(const struct retro_game_info *info)
 	}
 
 	/* Convert BK model to 0010/0011 flag */
-	fake_disk &= bkmodel >= 2;
+	fake_disk = bkmodel >= 2;
 	terak = bkmodel == 9;
 	bkmodel = bkmodel >= 3;
 	tty_open();             /* initialize the tty stuff */
@@ -489,6 +537,40 @@ bool retro_load_game(const struct retro_game_info *info)
 	return true;
 }
 
+bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num)
+{
+	if (!info)
+		return load_game_real(NULL, NULL, 0, NULL, 0);
+
+	return load_game_real(info->path, NULL, 0, info, num);
+}
+
+bool retro_load_game(const struct retro_game_info *info)
+{
+	int isdisk = 0;
+	const struct retro_game_info_ext *info_ext = NULL;
+	const char *extension = NULL;
+
+	if (!info)
+		return load_game_real(NULL, NULL, 0, NULL, 0);
+
+	if (environ_cb(RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, &info_ext) &&
+	    info_ext && (info_ext->file_in_archive ? info_ext->archive_file : info_ext->full_path)) {
+		extension = strrchr(info_ext->file_in_archive ? info_ext->archive_file : info_ext->full_path, '.');
+	} else if (info->path) {
+		extension = strrchr(info->path, '.');
+	}
+
+	isdisk = (extension && (strcasecmp(extension, ".img") == 0
+				|| strcasecmp(extension, ".dsk") == 0
+				 || strcasecmp(extension, ".bkd") == 0));
+
+	if (isdisk)
+		return load_game_real(info->path, NULL, 0, info, 1);
+
+	return load_game_real(info->path, info->data, info->size, NULL, 0);
+}
+
 void retro_unload_game(void)
 {
 }
@@ -496,14 +578,6 @@ void retro_unload_game(void)
 unsigned retro_get_region(void)
 {
    return RETRO_REGION_NTSC;
-}
-
-bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num)
-{
-   (void)type;
-   (void)info;
-   (void)num;
-   return false;
 }
 
 size_t retro_serialize_size(void)
@@ -529,12 +603,22 @@ bool retro_unserialize(const void *data_, size_t size)
 
 void *retro_get_memory_data(unsigned id)
 {
-	return NULL;
+       switch(id)
+       {
+       case RETRO_MEMORY_SAVE_RAM: // SRAM
+               return disks_total_size ? disks_buffer : NULL;
+       }
+       return NULL;
 }
 
 size_t retro_get_memory_size(unsigned id)
 {
-	return 0;
+       switch(id)
+       {
+       case RETRO_MEMORY_SAVE_RAM: // SRAM
+               return disks_total_size;
+       }
+       return 0;
 }
 
 void retro_cheat_reset(void)
@@ -562,6 +646,19 @@ void platform_sound_init() {
 }
 
 void platform_disk_init(disk_t *disks) {
+	char *diskptr = disks_buffer;
+	for (int i = 0; i < 4; i++) {
+		if (disk_size[i]) {
+			disks[i].length = disk_size[i];
+			disks[i].ro = 0;
+			disks[i].image = diskptr;
+		} else {
+			disks[i].length = 0;
+			disks[i].ro = 0;
+			disks[i].image = NULL;
+		}
+		diskptr += disk_size[i];
+	}
 }
 
 struct libretro_handle
