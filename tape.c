@@ -17,6 +17,7 @@
 #include <sys/ioctl.h>
 #endif
 #include "intl.h"
+#include <ctype.h>
 
 unsigned char tape_read_val = 1, tape_write_val = 0;
 FILE * tape_read_file = NULL;
@@ -219,6 +220,18 @@ void fake_read_strobe() {
                         fullpath = alloc_fullpath;
                 }
                 tape_read_file = fopen(fullpath, "r");
+                if (!tape_read_file) {
+			char *ptr;
+			if (alloc_fullpath)
+				ptr = alloc_fullpath + strlen(tape_prefix);
+			else
+				ptr = alloc_fullpath = strdup(unix_filename);
+			for (; *ptr; ptr++) {
+				*ptr = tolower(*ptr);
+			}
+			fullpath = alloc_fullpath;
+			tape_read_file = fopen(fullpath, "r");
+		}
 		fprintf(stderr, _("Will read unix file <%s> under BK name <%s>\n"),
 			fullpath, bk_filename);
 		fake_state = Addr;
