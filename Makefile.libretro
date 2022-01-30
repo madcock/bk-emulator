@@ -82,7 +82,7 @@ else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    fpic := -fPIC
    SHARED := -dynamiclib
-   MINVERSION := -mmacosx-version-min=10.1
+   MINVERSION := -mmacosx-version-min=10.4
 	OSXVER = `sw_vers -productVersion | cut -d. -f 2`
 	OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
 	fpic += $(MINVERSION)
