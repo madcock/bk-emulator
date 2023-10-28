@@ -5,7 +5,11 @@
 
 #define MAX_SOUND_AGE	~0	/* always play */ 
 
+#if !defined(SF2000)
 unsigned io_sound_freq = 44100;
+#else
+unsigned io_sound_freq = 11025;
+#endif
 
 /* Called after every instruction */
 void sound_flush() {

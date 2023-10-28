@@ -1,5 +1,6 @@
 bk
 bin/
+*.a
 *.o
 terakdisk
 maketape

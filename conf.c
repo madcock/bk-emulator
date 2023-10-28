@@ -42,7 +42,11 @@ iconf_t iconf[] = {
 	{ "HorizSize", &horsize, 256, 1024 },
 	{ "UpperPorch", &upper_porch, 0, 30 },
 	{ "LowerPorch", &lower_porch, 0, 30 },
+#if !defined(SF2000)
 	{ "SoundFreq", &io_sound_freq, 8000, 44100 }
+#else
+	{ "SoundFreq", &io_sound_freq, 8000, 11025 }
+#endif
 };
 
 bconf_t bconf[] = {
